@@ -150,6 +150,7 @@ void extractTokens(char* inString){
 	}
 
 	
+	
 	//call traverse token functions
 	traverseTokens(tokens, i, copy);
 
@@ -159,10 +160,16 @@ void extractTokens(char* inString){
 }
 
 void traverseTokens(char* tokens[], int size, char* inString){
+	//printf("i am here! 1 \n");
 	update_process_status();
 	//default_job_notification();
 	//create a new process and new job
 	Process *current_process = create_new_process();
+	char* command;
+	if(tail!=NULL){
+		command = tail->command_line;
+		//printf("haahahahah %s", tail->command_line);
+	}
 	
 	Job* current_job;
 	int isPipe = 0;
@@ -175,12 +182,15 @@ void traverseTokens(char* tokens[], int size, char* inString){
 	}
 	// if the commands are fg, bg, and jobs, need to write handler
 	if(strcmp(tokens[0], "fg") == 0){
+		//printf("i am here! 2\n");
 		free(current_process);
 		if(size == 1){
+			
+			//printf("haahahahah %s", tail->command_line);
 			if(tail!=NULL){
 				//tcsetpgrp(0, yash_pid);
-				printf("haaaaaa!");
-				printf("%s", tail->command_line);
+				//printf("haaaaaa!");
+				printf("%s\n", command);
 				foreground_process_handler();
 			}
 			return;
@@ -192,6 +202,7 @@ void traverseTokens(char* tokens[], int size, char* inString){
 			if(tail!= NULL){
 				if(tail->isBackground == 0){
 					printf("[%d]%c %s &", tail->job_number, '+', tail->command_line);
+
 				}
 				else{
 					printf("[%d]%c %s", tail->job_number, '+', tail->command_line);
@@ -342,7 +353,7 @@ void default_job_notification(int notification){
 		else if(job_stopped(current_job) && current_job->stop_notification != 1){
 			current_job->stop_notification = 1;
 			if(notification){
-				job_status_printer(current_job, "Stopped");
+				//job_status_printer(current_job, "Stopped");
 			}
 		}
 		else{
@@ -391,8 +402,8 @@ void update_process_status(){
 }
 
 void job_status_printer(Job* curr, char* job_state){
-	if (curr == tail){
-		printf("[%d] %c %s		%s\n", curr->job_number, curr->plus_minus, job_state, curr->command_line);
+	if (curr == tail->previous){
+		printf("[%d] %c %s		%s\n", curr->job_number, '+', job_state, curr->command_line);
 	}
 	else{
 		printf("[%d] %c %s		%s\n", curr->job_number, curr->plus_minus, job_state, curr->command_line);
@@ -423,7 +434,7 @@ void foreground_process_handler(){ //for handling fg
 	}
 	//get the recent job
 	Job* curr_job = tail;
-	printf("Handling fg!");
+	//printf("Handling fg!");
 	//mark all the processes as running
 	all_process_running(curr_job);
 	//if job is not done, get the terminal control and send a cont signal to continue the job
@@ -446,17 +457,17 @@ void foreground_process_handler(){ //for handling fg
 
 void background_process_handler(){ //for handling bg
 	if(total_job_num == 0){
-		printf("No such job!");
+		//printf("No such job!");
 		return;
 	}
 	//get the recent job
 	Job* curr_job = tail;
-	printf("Handling bg!");
+	//printf("Handling bg!");
 	//mark all the processes as running
 	all_process_running(curr_job);
 	//if job is not done, get the terminal control and send a cont signal to continue the job
 	if(job_done(curr_job)==0){
-		printf("Continue the job!");
+		//printf("Continue the job!");
 		//tcsetpgrp(0, curr_job->pgid);
 		kill(curr_job->pgid, SIGCONT);
 		curr_job->job_state = "Running";
