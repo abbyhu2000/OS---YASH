@@ -88,6 +88,7 @@ void update_process_status();
 void job_status_printer(Job* job, char* state);
 void default_job_notification(int notification);
 int count_running_job();
+Job* most_recent_stop_job();
 
 int main(){
 	//ignore for the yash process
@@ -203,16 +204,23 @@ void traverseTokens(char* tokens[], int size, char* inString){
 	else if(strcmp(tokens[0], "bg") == 0){
 		free(current_process);
         if(size == 1){
-			if(tail!= NULL){
-				if(tail->isBackground == 0){
-					printf("[%d]%c %s &\n", tail->job_number, '+', tail->command_line);
 
-				}
-				else{
-					printf("[%d]%c %s\n", tail->job_number, '+', tail->command_line);
-				}
-            	background_process_handler();
+			Job* recent_stop = most_recent_stop_job();
+			if(recent_stop == NULL){
+				printf("There are no stopped job!\n");
+				return;
 			}
+			
+			if(recent_stop->isBackground == 0){
+				printf("[%d]%c %s &\n", recent_stop->job_number, '+', recent_stop->command_line);
+
+			}
+			else{
+				printf("[%d]%c %s\n", recent_stop->job_number, '+', recent_stop->command_line);
+			}
+
+            background_process_handler();
+			
 			return;
         }
  
@@ -480,13 +488,29 @@ void foreground_process_handler(){ //for handling fg
 	}
 }
 
+Job* most_recent_stop_job(){
+	Job* most_recent_stop_job = tail;
+	while(most_recent_stop_job){
+		if(job_stopped(most_recent_stop_job)==1){
+			return most_recent_stop_job;
+		}
+		most_recent_stop_job = most_recent_stop_job -> previous;
+	}
+	return NULL;
+}
+
+
 void background_process_handler(){ //for handling bg
 	if(total_job_num == 0){
 		//printf("No such job!");
 		return;
 	}
-	//get the recent job
-	Job* curr_job = tail;
+	//get the most recent stopped job
+	Job* curr_job = most_recent_stop_job();
+	if(curr_job==NULL){
+		return;
+	}
+	
 	//printf("Handling bg!");
 	//mark all the processes as running
 	all_process_running(curr_job);
