@@ -66,8 +66,8 @@ Job* foreground_job = NULL;
 pid_t yash_pid; //the process ID of yash program
 int total_running_job_num = 0;
 int total_job_num=0;
-int DEBUG = 1; //for debugging purposes
-//int DEBUG = 0;
+//int DEBUG = 1; //for debugging purposes
+int DEBUG = 0;
 
 void extractTokens(char* inString);
 void traverseTokens(char* tokens[], int size, char* inString);
@@ -205,11 +205,11 @@ void traverseTokens(char* tokens[], int size, char* inString){
         if(size == 1){
 			if(tail!= NULL){
 				if(tail->isBackground == 0){
-					printf("[%d]%c %s &", tail->job_number, '+', tail->command_line);
+					printf("[%d]%c %s &\n", tail->job_number, '+', tail->command_line);
 
 				}
 				else{
-					printf("[%d]%c %s", tail->job_number, '+', tail->command_line);
+					printf("[%d]%c %s\n", tail->job_number, '+', tail->command_line);
 				}
             	background_process_handler();
 			}
