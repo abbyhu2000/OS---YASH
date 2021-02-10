@@ -26,7 +26,7 @@
 #define MAX_LINE 2000
 #define MAX_TOKEN_LEN 30
 #define MAX_JOB 20
-#define MAX_TOKEN 150
+#define MAX_TOKEN 128
 
 
 
@@ -64,10 +64,9 @@ Job* head = NULL;
 Job* tail = NULL;
 Job* foreground_job = NULL;
 pid_t yash_pid; //the process ID of yash program
-int total_running_job_num = 0;
-int total_job_num=0;
-int DEBUG = 1; //for debugging purposes
-//int DEBUG = 0;
+int total_job_num = 0;
+//int DEBUG = 1; //for debugging purposes
+int DEBUG = 0;
 
 void extractTokens(char* inString);
 void traverseTokens(char* tokens[], int size, char* inString);
@@ -87,7 +86,6 @@ void delete_job(Job* delete_job);
 void update_process_status();
 void job_status_printer(Job* job, char* state);
 void default_job_notification(int notification);
-int count_running_job();
 
 int main(){
 	//ignore for the yash process
@@ -123,8 +121,6 @@ int main(){
 
         //extract tokens from the command line
 		extractTokens(inString);
-		//int count = count_running_job();
-		//printf("total: %d", count);
 	}
 }
 
@@ -268,9 +264,6 @@ void traverseTokens(char* tokens[], int size, char* inString){
 				isPipe = 1;
 				Process* first_process = current_process;
 				current_job = create_new_job(inString, first_process);
-				if(current_job == NULL){
-					return;
-				}
 				//create the second process
 				current_process = create_new_process();
 				cur_arg = 0;
@@ -305,9 +298,6 @@ void traverseTokens(char* tokens[], int size, char* inString){
 				printf("No pipe and ready to create new job!\n");
 			}
 			current_job = create_new_job(inString, current_process);
-			if(current_job==NULL){
-				return;
-			}
 			if(DEBUG==1){
 				printf("Nopipe: The command is %s\n", current_job->process_list->command_args[0]);
 			}
@@ -373,11 +363,10 @@ void default_job_notification(int notification){
 }
 
 void delete_job(Job* current_job){
-	total_job_num--;
+	total_job_num --;
 	Job* delete_job = current_job;
 	if(delete_job==head && delete_job==tail){
 		free(delete_job);
-		//total_running_job_num --;
 		head = NULL;
 		tail = NULL;
 	}
@@ -385,20 +374,17 @@ void delete_job(Job* current_job){
 		head = head->next;
 		head -> previous = NULL;
 		free(delete_job);
-		//total_running_job_num --;
 	}
 	else if(delete_job == tail){
 		tail = tail -> previous;
 		tail -> next = NULL;
 		tail -> plus_minus = '+';
 		free(delete_job);
-		//total_running_job_num --;
 	}
 	else{
 		delete_job->previous->next = delete_job->next;
 		delete_job->next->previous = delete_job->previous;
 		free(delete_job);
-		//total_running_job_num --;
 	}
 }
 
@@ -408,17 +394,11 @@ void update_process_status(){
 	pid_t pid;
 	int status;
 
-	/* pid = waitpid(-1, &status, WUNTRACED|WNOHANG);
+	pid = waitpid(-1, &status, WUNTRACED|WNOHANG);
 	//WNOHANG will return immediately even if no child has exits
 	while(!traverse_process_status(pid, status)){
 		pid = waitpid(-1, &status, WUNTRACED|WNOHANG);
-	} */
-
-	do
-	{
-		pid = waitpid(WAIT_ANY, &status, WUNTRACED|WNOHANG);
-	} while (! traverse_process_status(pid, status));
-	
+	}
 }
 
 void job_status_printer(Job* curr, char* job_state){
@@ -461,16 +441,11 @@ void foreground_process_handler(){ //for handling fg
 	if(job_done(curr_job)==0){
 		//printf("Continue the job!");
 		//printf("%s", curr_job->command_line);
-
 		tcsetpgrp(0, curr_job->pgid);
-		kill(-curr_job->pgid, SIGCONT);
+		kill(curr_job->pgid, SIGCONT);
 		foreground_job = curr_job;
 		curr_job->job_state = "Running";
-		//get rid of the & at the end
-		if(curr_job->isBackground == 1){
-			curr_job->command_line[strlen(curr_job->command_line)-1]='\0';
-		}
-		curr_job->isBackground = 0;
+		curr_job->isBackground=0;
 
 		wait_job_to_complete(curr_job);
 		tcsetpgrp(0, yash_pid);
@@ -494,8 +469,7 @@ void background_process_handler(){ //for handling bg
 	if(job_done(curr_job)==0){
 		//printf("Continue the job!");
 		//tcsetpgrp(0, curr_job->pgid);
-	
-		kill(-curr_job->pgid, SIGCONT);
+		kill(curr_job->pgid, SIGCONT);
 		curr_job->job_state = "Running";
 		/* if(curr_job->isBackground == 0){
 			printf("[%d]%c %s &", curr_job->job_number, '+', curr_job->command_line);
@@ -503,13 +477,6 @@ void background_process_handler(){ //for handling bg
 		else{
 			printf("[%d]%c %s", curr_job->job_number, '+', curr_job->command_line);
 		} */
-
-		if(curr_job->isBackground == 0){
-			char back1 = ' ';
-			char back2 = '&';
-			strncat(curr_job->command_line, &back1, 1);
-			strncat(curr_job->command_line, &back2, 1);
-		}
 		curr_job->isBackground = 1;
 		
 	}
@@ -671,19 +638,10 @@ void exec_job(Job* current_job, int isPipe, int isBackground){
 		close(pfd[0]);
 		close(pfd[1]);
 
-		
-			if(isBackground==0){ //foreground
-				tcsetpgrp(0, current_job->pgid); //control to current job
-				if (DEBUG==1){
-					printf("Job is foreground, Before wait_to_complete!\n");
-				}
-				wait_job_to_complete(current_job);
-				tcsetpgrp(0, yash_pid);	//parent takes back the control of terminal
-			}
-			else{ //background
-				tcsetpgrp(0, yash_pid); //yash takes control back
-			}
-
+		if(isBackground==0){
+			waitpid(-1, &status, 0);
+			waitpid(-1, &status, 0);
+		}
 
 		//after two child both finished
 		if(DEBUG==1){
@@ -788,18 +746,12 @@ void wait_job_to_complete(Job* current_job){
 	int status;
 
 	//need to wait for all children either stopped or terminated
-	//pid = waitpid(-1, &status, WUNTRACED); //return when child has completed or has stopped by signal
+	pid = waitpid(-1, &status, WUNTRACED); //return when child has completed or has stopped by signal
 											//return the pid of the child
 											//return the status of the child
-	/* while(!traverse_process_status(pid, status) && !job_stopped(current_job) && !job_done(current_job)){
+	while(!traverse_process_status(pid, status) && !job_stopped(current_job) && !job_done(current_job)){
 		pid = waitpid(-1, &status, WUNTRACED);
-	} */
-
-	do
-	{
-		pid = waitpid(WAIT_ANY, &status, WUNTRACED); 
-	} while (!traverse_process_status(pid, status)&& !job_stopped(current_job)&& !job_done(current_job));
-	
+	}
 	if(DEBUG==1){
 		printf("The job is complete!\n");
 	}
@@ -817,9 +769,6 @@ int traverse_process_status(int pid, int status){
 					current_process->status = status;
 					if(WIFSTOPPED(status)){
 						current_process->stopped = 1;
-						if(DEBUG==1){
-							printf("Stopped by the signal!\n");
-						}
 					}
 					else{
 						current_process->done = 1;
@@ -830,12 +779,10 @@ int traverse_process_status(int pid, int status){
 						}
 					}
 					return 0;
-				}	
+				}
 			}
 		}
-		return -1;
 	}
-	
 	else if(pid == 0){
 		return -1;
 	}
@@ -860,7 +807,7 @@ int job_done(Job* current_job){
 int job_stopped(Job* current_job){
 	Process* curr_p;
 	for(curr_p = current_job->process_list;curr_p;curr_p=curr_p->next){
-		if(curr_p->stopped == 0 && curr_p->done == 0){
+		if(curr_p->stopped == 0){
 			return 0;
 		}
 	}
@@ -872,7 +819,7 @@ int job_stopped(Job* current_job){
 void sig_handler(int signo) {
    switch(signo){
       case SIGCHLD:
-
+	  		//printf("Parent caught child either stop or terminate!");
       break;
    }
 }
@@ -894,12 +841,7 @@ Process* create_new_process(){
 }
 
 Job* create_new_job(char* inString, Process* current_process){
-    //create a job
-	/* int count = count_running_job();
-	printf("total: %d", count);
-	if(count==20){
-		return NULL;
-	}  */
+        //create a job
     Job *current_job = (Job *)malloc(sizeof(Job));
 	if (head == NULL){ //the first job
 		head = current_job;
@@ -924,20 +866,7 @@ Job* create_new_job(char* inString, Process* current_process){
 	current_job -> pgid = 0;
 	current_job -> isBackground = 0;
 	current_job -> stop_notification = 0;
-	total_running_job_num ++;
-	total_job_num++;
+	total_job_num ++;
 	return current_job;
-}
 
-int count_running_job(){
-	int count = 0;
-	Job* curr_j = head;
-	while(curr_j){
-		if(curr_j->job_state=="Running"){
-			count++;
-			curr_j=curr_j->next;
-		}
-	}
-	return count;
 }
-
